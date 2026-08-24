@@ -2,7 +2,6 @@
 
 ![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)
 
 ## Features
 
@@ -11,7 +10,7 @@
 - **Smart Notifications** - Get reminded 10, 5, and 1 minute before each event
 - **Multi-Timezone Support** - View all events in your local timezone
 - **System Tray Integration** - Minimize to tray and keep running in background
-- **Sound Alerts** - Optional sound notifications for events
+- **Sound Alerts** - Text to speech alerts.
 - **Persistent Storage** - All events saved automatically to `schedule.json`
 
 ## Quick Start
