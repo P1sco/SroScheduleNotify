@@ -18,6 +18,13 @@ AAABAAEAAAAAAAEAIAAoIAQAFgAAACgAAAAAAQAAAAIAAAEAIAAAAAAAAAAEAHYAAAB2AAAAAAAAAAAA
 """
 
 try:
+    import pyttsx3
+    HAS_TTS = True
+except ImportError:
+    HAS_TTS = False
+    print("pyttsx3 not installed. Install with: pip install pyttsx3")
+
+try:
     from playsound import playsound
     USE_PLAYSOUND = True
 except ImportError:
@@ -28,54 +35,123 @@ except ImportError:
     except ImportError:
         USE_WINSOUND = False
 
+def get_app_dir():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    else:
+        return os.path.dirname(os.path.abspath(__file__))
+
 def get_notification_icon_path():
-    """Write the embedded icon to a temp .ico file (once) and return its path.
-    plyer's notify() needs a real file path, not raw bytes."""
     try:
-        icon_path = os.path.join(
-            os.environ.get("TEMP", os.path.dirname(os.path.abspath(__file__))),
-            "sro_schedule_icon.ico"
-        )
-        if not os.path.exists(icon_path):
+        app_dir = get_app_dir()
+        icon_path = os.path.join(app_dir, "favicon.ico")
+        if not os.path.exists(icon_path) and ICON_BASE64:
             with open(icon_path, "wb") as f:
                 f.write(base64.b64decode(ICON_BASE64))
-        return icon_path
+        return icon_path if os.path.exists(icon_path) else None
     except Exception:
         return None
 
 NOTIFICATION_ICON_PATH = get_notification_icon_path()
 
+class TTSManager:
+    def __init__(self):
+        self.engine = None
+        self.init_tts()
+    
+    def init_tts(self):
+        try:
+            import pyttsx3
+            self.engine = pyttsx3.init()
+            
+            try:
+                voices = self.engine.getProperty('voices')
+                for voice in voices:
+                    if 'male' in voice.name.lower() or 'david' in voice.name.lower():
+                        self.engine.setProperty('voice', voice.id)
+                        print(f"Set voice: {voice.name}")
+                        break
+            except:
+                pass
+            
+            self.engine.setProperty('rate', 160)
+            print("TTS initialized with pyttsx3 (speed: 160)")
+            return True
+        except Exception as e:
+            print(f"TTS initialization failed: {e}")
+            self.engine = None
+            return False
+    
+    def speak(self, text):
+        if not self.engine:
+            print(f"TTS unavailable - would say: {text}")
+            try:
+                import winsound
+                winsound.Beep(800, 200)
+                winsound.Beep(1000, 200)
+            except:
+                print("\a")
+            return False
+        try:
+            print(f"Speaking: {text}")
+            self.engine.say(text)
+            self.engine.runAndWait()
+            return True
+        except Exception as e:
+            print(f"TTS error: {e}")
+            return False
+
+tts_manager = TTSManager()
+
 class NotificationThread(QThread):
     finished = pyqtSignal()
     
-    def __init__(self, title, message, sound_file):
+    def __init__(self, title, message, sound_file, event_name, minutes_before):
         super().__init__()
         self.title = title
         self.message = message
         self.sound_file = sound_file
+        self.event_name = event_name
+        self.minutes_before = minutes_before
     
     def run(self):
         try:
-            notification.notify(
-                title=self.title,
-                message=self.message,
-                app_icon=NOTIFICATION_ICON_PATH or "",
-                timeout=10
-            )
+            notification_sent = False
             
-            if os.path.exists(self.sound_file):
-                if USE_PLAYSOUND:
-                    playsound(self.sound_file, block=True)
-                elif USE_WINSOUND:
-                    winsound.PlaySound(self.sound_file, winsound.SND_FILENAME)
-            else:
+            try:
+                notification.notify(
+                    title=self.title,
+                    message=self.message,
+                    app_icon=NOTIFICATION_ICON_PATH or "",
+                    timeout=10
+                )
+                notification_sent = True
+                print("Notification sent via plyer")
+            except Exception as e:
+                print(f"plyer notification failed: {e}")
+            
+            if not notification_sent:
                 try:
-                    if USE_WINSOUND:
-                        winsound.Beep(1000, 500)
-                    else:
-                        print("\a")
-                except:
-                    pass
+                    from win10toast import ToastNotifier
+                    toaster = ToastNotifier()
+                    toaster.show_toast(self.title, self.message, duration=10)
+                    notification_sent = True
+                    print("Notification sent via win10toast")
+                except Exception as e:
+                    print(f"win10toast failed: {e}")
+            
+            if not notification_sent:
+                try:
+                    import ctypes
+                    ctypes.windll.user32.MessageBoxW(0, self.message, self.title, 1)
+                    print("Notification sent via MessageBox")
+                except Exception as e:
+                    print(f"MessageBox failed: {e}")
+            
+            speak_text = f"{self.event_name} in {self.minutes_before} minutes"
+            print(f"Attempting TTS: {speak_text}")
+            tts_manager.speak(speak_text)
+                    
         except Exception as e:
             print(f"Notification error: {e}")
         finally:
@@ -214,25 +290,35 @@ class AddEditEventDialog(QDialog):
 class ScheduleManager(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.schedule_file = "schedule.json"
-        self.sound_file = "xxx.wav"
+        app_dir = get_app_dir()
+        self.schedule_file = os.path.join(app_dir,"schedule.json")
+        self.sound_file = os.path.join(app_dir,"xxx.wav")
         self.schedule = []
         self.notification_timers = []
         self.current_gmt_offset = 3
         self.notification_threads = []
+        self.is_updating = False
+        self.timers_initialized = False
+        self.is_exiting = False
         
         self.countdown_timer = QTimer()
         self.countdown_timer.timeout.connect(self.update_countdowns)
-        self.countdown_timer.start(1000)  # Update every second
+        self.countdown_timer.start(1000)
         
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.sort_and_update_list)
-        self.update_timer.start(30000) 
+        self.update_timer.start(30000)
+        
+        # Timer to check for new timers every minute
+        self.timer_check = QTimer()
+        self.timer_check.timeout.connect(self.check_and_setup_timers)
+        self.timer_check.start(60000)
+        
         self.init_ui()
         self.setup_tray_icon()
-    
         self.load_schedule()
-        self.setup_notification_timers()
+        
+        QTimer.singleShot(1000, self.check_and_setup_timers)
 
     def setup_tray_icon(self):
         if not QSystemTrayIcon.isSystemTrayAvailable():
@@ -272,9 +358,34 @@ class ScheduleManager(QMainWindow):
         self.raise_()
 
     def quit_application(self):
+        self.is_exiting = True
+        self.cleanup_all()
         if self.tray_icon:
             self.tray_icon.hide()
         QApplication.quit()
+
+    def cleanup_all(self):
+        print("Cleaning up all resources...")
+        
+        for thread in self.notification_threads:
+            if thread.isRunning():
+                thread.quit()
+                thread.wait()
+        self.notification_threads.clear()
+        
+        for timer in self.notification_timers:
+            if timer.isActive():
+                timer.stop()
+        self.notification_timers.clear()
+        
+        if hasattr(self, 'update_timer'):
+            self.update_timer.stop()
+        if hasattr(self, 'countdown_timer'):
+            self.countdown_timer.stop()
+        if hasattr(self, 'timer_check'):
+            self.timer_check.stop()
+        
+        print("Cleanup complete")
 
     def changeEvent(self, event):
         if event.type() == QEvent.Type.WindowStateChange and self.isMinimized():
@@ -285,12 +396,10 @@ class ScheduleManager(QMainWindow):
         super().changeEvent(event)
 
     def closeEvent(self, event):
-        for thread in self.notification_threads:
-            if thread.isRunning():
-                thread.quit()
-                thread.wait()
-        self.update_timer.stop()
-        self.countdown_timer.stop()
+        """Handle window close event (X button)"""
+        self.is_exiting = True
+        self.cleanup_all()
+        
         if self.tray_icon:
             self.tray_icon.hide()
         super().closeEvent(event)
@@ -298,7 +407,7 @@ class ScheduleManager(QMainWindow):
     def init_ui(self):
         self.setWindowTitle("Silkroad Schedule Manager")
         self.setGeometry(100, 100, 660, 450)
-        self.setFixedSize(670, 480)
+        self.setFixedSize(660, 480)
         
         self.setStyleSheet("""
             QMainWindow {
@@ -598,6 +707,7 @@ class ScheduleManager(QMainWindow):
         list_layout.addLayout(status_layout)
         list_group.setLayout(list_layout)
         main_layout.addWidget(list_group)
+        
         footer_label = QLabel('⚠️ This Software is 100% Free & Open Source. If you paid for this software, you were scammed. Made with love by Pisco ❤️')
         footer_label.setStyleSheet("""
             color: #666;
@@ -680,7 +790,6 @@ class ScheduleManager(QMainWindow):
         upcoming.sort(key=lambda x: x[0])
         min_time = upcoming[0][0]
         
-        # Get all events at the minimum time (within the same minute)
         return [(time, event) for time, event in upcoming if time == min_time]
     
     def sort_events_by_time(self):
@@ -726,47 +835,110 @@ class ScheduleManager(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to save schedule: {str(e)}")
     
     def update_countdowns(self):
-        # Only update if we have items and the list is visible
-        if self.event_list.count() > 0:
+        if self.event_list.count() > 0 and not self.is_updating and not self.is_exiting:
             self.update_event_list()
     
     def sort_and_update_list(self):
-        self.sort_events_by_time()
-        self.update_event_list()
+        if not self.is_updating and not self.is_exiting:
+            self.sort_events_by_time()
+            self.update_event_list()
     
     def update_event_list(self):
-        self.event_list.clear()
-        current_offset = self.get_gmt_offset_from_string(self.timezone_combo.currentText())
+        if self.is_updating or self.is_exiting:
+            return
         
-        # Get upcoming events for countdown
-        upcoming_events = self.get_upcoming_events()
-        upcoming_times = [time for time, _ in upcoming_events]
+        self.is_updating = True
+        try:
+            self.event_list.clear()
+            current_offset = self.get_gmt_offset_from_string(self.timezone_combo.currentText())
+            
+            upcoming_events = self.get_upcoming_events()
+            
+            for idx, event in enumerate(self.schedule):
+                display_time = self.convert_time_to_gmt(event['time'], 3, current_offset)
+                indicator = "🟢" if event.get('notify', True) else "🔴"
+                
+                is_upcoming = False
+                countdown_text = ""
+                
+                if upcoming_events:
+                    for evt_time, evt in upcoming_events:
+                        if evt is event:
+                            is_upcoming = True
+                            countdown_text = self.get_countdown(event['time'])
+                            break
+                
+                if is_upcoming:
+                    item_text = f"{indicator} {event['name']}  •  {display_time}  ⏱️ {countdown_text}"
+                else:
+                    item_text = f"{indicator} {event['name']}  •  {display_time}"
+                
+                self.event_list.addItem(item_text)
+            
+            self.count_label.setText(f"{len(self.schedule)} events")
+        finally:
+            self.is_updating = False
+    
+    def check_and_setup_timers(self):
+        """Check if we need to set up timers for upcoming events"""
+        if not self.schedule or self.is_exiting:
+            return
+            
+        self.cleanup_stale_timers()
         
-        for idx, event in enumerate(self.schedule):
-            display_time = self.convert_time_to_gmt(event['time'], 3, current_offset)
-            indicator = "🟢" if event.get('notify', True) else "🔴"
-            
-            # Check if this event is in the upcoming events list
-            is_upcoming = False
-            countdown_text = ""
-            
-            if upcoming_events:
-                # Check if this event's time matches any upcoming event time
-                for evt_time, evt in upcoming_events:
-                    if evt is event:  # Compare by object identity
-                        is_upcoming = True
-                        countdown_text = self.get_countdown(event['time'])
-                        break
-            
-            if is_upcoming:
-                item_text = f"{indicator} {event['name']}  •  {display_time}  ⏱️ {countdown_text}"
+        now_utc = datetime.utcnow()
+        now_gmt3 = now_utc + timedelta(hours=3)
+        
+        for event in self.schedule:
+            if not event.get('notify', True):
+                continue
+                
+            try:
+                hour, minute = map(int, event['time'].split(':'))
+                event_time = now_gmt3.replace(hour=hour, minute=minute, second=0, microsecond=0)
+                
+                if event_time < now_gmt3:
+                    event_time += timedelta(days=1)
+                
+                time_diff = (event_time - now_gmt3).total_seconds()
+                
+                if 0 < time_diff <= 3600:
+                    for minutes_before in [10, 5, 1]:
+                        notify_time = event_time - timedelta(minutes=minutes_before)
+                        if notify_time > now_gmt3:
+                            timer_exists = False
+                            for timer in self.notification_timers:
+                                if hasattr(timer, '_event_name') and hasattr(timer, '_minutes_before'):
+                                    if timer._event_name == event['name'] and timer._minutes_before == minutes_before:
+                                        timer_exists = True
+                                        break
+                            
+                            if not timer_exists:
+                                delay_ms = int((notify_time - now_gmt3).total_seconds() * 1000)
+                                
+                                timer = QTimer(self)
+                                timer.setSingleShot(True)
+                                timer._event_name = event['name']
+                                timer._minutes_before = minutes_before
+                                timer.timeout.connect(
+                                    lambda checked=False, e=event.copy(), m=minutes_before: 
+                                    self.send_notification(e, m)
+                                )
+                                
+                                self.notification_timers.append(timer)
+                                timer.start(delay_ms)
+                                print(f"Timer set for {event['name']} at {minutes_before} minutes before")
+            except Exception as e:
+                print(f"Error setting up notification for {event}: {e}")
+    
+    def cleanup_stale_timers(self):
+        active_timers = []
+        for timer in self.notification_timers:
+            if timer.isActive():
+                active_timers.append(timer)
             else:
-                item_text = f"{indicator} {event['name']}  •  {display_time}"
-            
-            self.event_list.addItem(item_text)
-        
-        self.count_label.setText(f"{len(self.schedule)} events")
-        self.setup_notification_timers()
+                print(f"Removing stale timer for {getattr(timer, '_event_name', 'unknown')}")
+        self.notification_timers = active_timers
     
     def on_timezone_change(self):
         current_selection = self.event_list.currentRow()
@@ -795,6 +967,7 @@ class ScheduleManager(QMainWindow):
                 self.status_indicator.setStyleSheet("background-color: #4CAF50; border-radius: 6px;")
                 self.status_label.setText(f"Added: {event_data['name']}")
                 QTimer.singleShot(1500, lambda: self.status_label.setText("Ready"))
+                QTimer.singleShot(100, self.check_and_setup_timers)
     
     def edit_event(self):
         current_row = self.event_list.currentRow()
@@ -817,6 +990,7 @@ class ScheduleManager(QMainWindow):
                 self.status_label.setText(f"Edited: {new_data['name']}")
                 QTimer.singleShot(1500, lambda: self.status_indicator.setStyleSheet("background-color: #4CAF50; border-radius: 6px;"))
                 QTimer.singleShot(1500, lambda: self.status_label.setText("Ready"))
+                QTimer.singleShot(100, self.check_and_setup_timers)
     
     def delete_event(self):
         current_row = self.event_list.currentRow()
@@ -837,6 +1011,7 @@ class ScheduleManager(QMainWindow):
             self.status_label.setText(f"Deleted: {event_name}")
             QTimer.singleShot(1500, lambda: self.status_indicator.setStyleSheet("background-color: #4CAF50; border-radius: 6px;"))
             QTimer.singleShot(1500, lambda: self.status_label.setText("Ready"))
+            QTimer.singleShot(100, self.check_and_setup_timers)
     
     def toggle_notify_on(self):
         current_row = self.event_list.currentRow()
@@ -850,6 +1025,7 @@ class ScheduleManager(QMainWindow):
         self.event_list.setCurrentRow(current_row)
         self.status_label.setText("Notifications enabled for selected event")
         QTimer.singleShot(1500, lambda: self.status_label.setText("Ready"))
+        QTimer.singleShot(100, self.check_and_setup_timers)
     
     def toggle_notify_off(self):
         current_row = self.event_list.currentRow()
@@ -873,6 +1049,7 @@ class ScheduleManager(QMainWindow):
         self.status_label.setText("All events set to notify")
         QTimer.singleShot(1500, lambda: self.status_label.setText("Ready"))
         QTimer.singleShot(1500, lambda: self.status_indicator.setStyleSheet("background-color: #4CAF50; border-radius: 6px;"))
+        QTimer.singleShot(100, self.check_and_setup_timers)
     
     def unnotify_all(self):
         for event in self.schedule:
@@ -884,54 +1061,12 @@ class ScheduleManager(QMainWindow):
         QTimer.singleShot(1500, lambda: self.status_label.setText("Ready"))
         QTimer.singleShot(1500, lambda: self.status_indicator.setStyleSheet("background-color: #4CAF50; border-radius: 6px;"))
     
-    def setup_notification_timers(self):
-        for timer in self.notification_timers:
-            timer.stop()
-        self.notification_timers.clear()
-        
-        for thread in self.notification_threads:
-            if thread.isRunning():
-                thread.quit()
-                thread.wait()
-        self.notification_threads.clear()
-        
-        now_utc = datetime.utcnow()
-        now_gmt3 = now_utc + timedelta(hours=3)
-        
-        for event in self.schedule:
-            if not event.get('notify', True):
-                continue
-                
-            try:
-                hour, minute = map(int, event['time'].split(':'))
-                event_time_gmt3 = now_gmt3.replace(hour=hour, minute=minute, second=0, microsecond=0)
-                
-                if event_time_gmt3 < now_gmt3:
-                    event_time_gmt3 += timedelta(days=1)
-                
-                for minutes_before in [10, 5, 1]:
-                    notify_time = event_time_gmt3 - timedelta(minutes=minutes_before)
-                    if notify_time > now_gmt3:
-                        delay_ms = int((notify_time - now_gmt3).total_seconds() * 1000)
-                        
-                        timer = QTimer()
-                        timer.setSingleShot(True)
-                        timer.timeout.connect(
-                            lambda e=event.copy(), m=minutes_before: 
-                            self.send_notification(e, m)
-                        )
-                        
-                        self.notification_timers.append(timer)
-                        QTimer.singleShot(delay_ms, timer.start)
-            except Exception as e:
-                print(f"Error setting up notification for {event}: {e}")
-    
     def send_notification(self, event, minutes_before):
         try:
             title = f"Event Reminder - {minutes_before} min"
             message = f"{event['name']} is in {minutes_before} minute(s)"
             
-            thread = NotificationThread(title, message, self.sound_file)
+            thread = NotificationThread(title, message, self.sound_file, event['name'], minutes_before)
             thread.finished.connect(self.on_notification_finished)
             self.notification_threads.append(thread)
             thread.start()
@@ -940,6 +1075,9 @@ class ScheduleManager(QMainWindow):
             self.status_label.setText(f"Notification sent: {event['name']} ({minutes_before} min)")
             QTimer.singleShot(2000, lambda: self.status_label.setText("Ready"))
             QTimer.singleShot(2000, lambda: self.status_indicator.setStyleSheet("background-color: #4CAF50; border-radius: 6px;"))
+            
+            QTimer.singleShot(100, self.cleanup_stale_timers)
+            QTimer.singleShot(200, self.check_and_setup_timers)
         except Exception as e:
             print(f"Error sending notification: {e}")
     
@@ -963,4 +1101,4 @@ def main():
     sys.exit(app.exec())
 
 if __name__ == "__main__":
-   main()
+    main()
