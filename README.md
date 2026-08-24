@@ -4,7 +4,7 @@
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey.svg)
 
-## ✨ Features
+## Features
 
 - **Event Management** - Add, edit, and delete scheduled events with ease
 - **Real-time Countdown** - Live countdown timer showing time until the next event(s)
