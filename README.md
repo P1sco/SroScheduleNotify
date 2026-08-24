@@ -24,7 +24,7 @@ cd silkroad-schedule-manager
 ```
 2. **Install dependencies**
 ```bash
-pip install PyQt6 plyer playsound
+pip install PyQt6 plyer playsound pyttsx3
 ```
 3. Run **the application**
 ```bash
