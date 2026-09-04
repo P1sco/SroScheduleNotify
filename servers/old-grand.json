@@ -1,0 +1,14 @@
+[
+    { "name": "Capture the Flag", "time": "01:00", "notify": true },
+    { "name": "Capture the Flag", "time": "03:00", "notify": true },
+    { "name": "Capture the Flag", "time": "05:00", "notify": true },
+    { "name": "Capture the Flag", "time": "07:00", "notify": true },
+    { "name": "Capture the Flag", "time": "09:00", "notify": true },
+    { "name": "Capture the Flag", "time": "11:00", "notify": true },
+    { "name": "Capture the Flag", "time": "13:00", "notify": true },
+    { "name": "Capture the Flag", "time": "15:00", "notify": true },
+    { "name": "Capture the Flag", "time": "17:00", "notify": true },
+    { "name": "Capture the Flag", "time": "19:00", "notify": true },
+    { "name": "Capture the Flag", "time": "21:00", "notify": true },
+    { "name": "Capture the Flag", "time": "23:00", "notify": true }
+]
