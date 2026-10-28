@@ -1,0 +1,199 @@
+{
+"events": [
+{
+"time": "00:00",
+"name": "Survival Arena Solo",
+"notify": true
+},
+{
+"time": "00:30",
+"name": "Smuggler Caravan",
+"notify": true
+},
+{
+"time": "01:00",
+"name": "Madness Event",
+"notify": true
+},
+{
+"time": "01:15",
+"name": "Fake Or Real",
+"notify": true
+},
+{
+"time": "01:30",
+"name": "Styria Clash",
+"notify": true
+},
+{
+"time": "02:00",
+"name": "CTF",
+"notify": true
+},
+{
+"time": "02:15",
+"name": "Last Man Standing",
+"notify": true
+},
+{
+"time": "02:30",
+"name": "Battle Arena Random",
+"notify": true
+},
+{
+"time": "03:00",
+"name": "CTF",
+"notify": true
+},
+{
+"time": "03:30",
+"name": "Smuggler Caravan",
+"notify": true
+},
+{
+"time": "04:00",
+"name": "Treasure Hunt",
+"notify": true
+},
+{
+"time": "05:00",
+"name": "Time To Sleep",
+"notify": true
+},
+{
+"time": "09:30",
+"name": "Smuggler Caravan",
+"notify": true
+},
+{
+"time": "10:00",
+"name": "CTF",
+"notify": true
+},
+{
+"time": "11:00",
+"name": "Last Man Standing",
+"notify": true
+},
+{
+"time": "12:00",
+"name": "Fake Or Real",
+"notify": true
+},
+{
+"time": "12:30",
+"name": "Smuggler Caravan",
+"notify": true
+},
+{
+"time": "13:00",
+"name": "CTF",
+"notify": true
+},
+{
+"time": "14:00",
+"name": "Battle Arena Random",
+"notify": true
+},
+{
+"time": "15:00",
+"name": "CTF",
+"notify": true
+},
+{
+"time": "15:30",
+"name": "Smuggler Caravan",
+"notify": true
+},
+{
+"time": "16:00",
+"name": "Medusa Equalized",
+"notify": true
+},
+{
+"time": "17:00",
+"name": "Battle Arena Random",
+"notify": true
+},
+{
+"time": "17:30",
+"name": "Fake Or Real",
+"notify": true
+},
+{
+"time": "18:00",
+"name": "CTF",
+"notify": true
+},
+{
+"time": "18:30",
+"name": "Smuggler Caravan",
+"notify": true
+},
+{
+"time": "19:00",
+"name": "Tower Defend",
+"notify": true
+},
+{
+"time": "19:30",
+"name": "Battle Arena Random",
+"notify": true
+},
+{
+"time": "20:00",
+"name": "A.R.A.M (Equalized)",
+"notify": true
+},
+{
+"time": "20:30",
+"name": "League of Legends (Equalized)",
+"notify": true
+},
+{
+"time": "21:00",
+"name": "Styria Clash",
+"notify": true
+},
+{
+"time": "21:30",
+"name": "Smuggler Caravan",
+"notify": true
+},
+{
+"time": "22:00",
+"name": "Survival Arena Solo",
+"notify": true
+},
+{
+"time": "22:30",
+"name": "Selket-Neith",
+"notify": true
+},
+{
+"time": "22:40",
+"name": "Treasure Hunt",
+"notify": true
+},
+{
+"time": "22:50",
+"name": "Anubis-Isis",
+"notify": true
+},
+{
+"time": "23:00",
+"name": "CTF",
+"notify": true
+},
+{
+"time": "23:20",
+"name": "Medusa Solo",
+"notify": true
+},
+{
+"time": "23:40",
+"name": "Medusa (Equalized)",
+"notify": true
+}
+]
+}
