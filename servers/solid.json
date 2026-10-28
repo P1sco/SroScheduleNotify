@@ -1,5 +1,4 @@
-{
-"events": [
+[
 {
 "time": "00:00",
 "name": "Survival Arena Solo",
@@ -196,4 +195,3 @@
 "notify": true
 }
 ]
-}
