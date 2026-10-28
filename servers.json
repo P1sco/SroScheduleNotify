@@ -6,5 +6,9 @@
   {
     "name": "Old Silkroad Grand",
     "url": "https://raw.githubusercontent.com/P1sco/SroScheduleNotify/refs/heads/main/servers/old-grand.json"
+  },
+  {
+    "name": "Solid - S3",
+    "url": "https://raw.githubusercontent.com/P1sco/SroScheduleNotify/refs/heads/main/servers/old.json"
   }
 ]
